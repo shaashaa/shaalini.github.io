@@ -1,0 +1,117 @@
+---
+title: "Prac_Mach_Learn Proj"
+output: html_document
+---
+#Synopsis
+
+##Data has been collected from accelerometers on the belt, forearm, arm, and dumbell of 6 participants using the fitness devices such as Jawbone Up, Nike FuelBand, and Fitbit. The participants were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har 
+
+##The goal of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+
+#Reading data
+
+##The training data for this project are available here:
+##https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+##The test data are available here:
+##https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+##The data for this project come from this source: ##http://groupware.les.inf.puc-rio.br/har.
+
+```{r}
+# Reading training and testing data
+training_dt <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", header=TRUE, na.strings = c("NA","NAN", ""), row.names = 1)
+testing_dt <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", header=TRUE, na.strings = c("NA","NAN", ""), row.names = 1)
+```
+
+#Initialysing
+
+## Loaded in the required library and set the seed to 111, for reproducibility
+```{r}
+#Initialysing
+library(caret)
+library(ggplot2)
+library(rattle)
+library(randomForest)
+
+set.seed(111)
+```
+
+#Data processing
+
+##As we need to perform prediction on the classe variable against all the other variables, we need to remove those unwanted or not useful variables. Removed the columns with NAs. And also reviewed the data set and removed the first 6 columns which is not needed for this analysis
+
+```{r}
+#Removing the columns with NAs
+new_training <-training_dt[,colSums(is.na(training_dt)) == 0]
+new_testing <-testing_dt[,colSums(is.na(testing_dt)) == 0]
+
+str(new_training)
+
+#Removing the first few columns like raw_timestamp_part_1 which is not needed for this analysis
+new_training <- new_training[,-c(1,2,3,4,5,6)]
+new_testing <- new_testing[,-c(1,2,3,4,5,6)]
+```
+
+```{r}
+#Plotting classe variable
+plot(new_training$classe, xlab="classse", ylab="Frequency")
+```
+
+#Cross-validation
+
+##Performed cross-validation by splitting the original training set into a sub training and sub testing test.
+
+```{r}
+# Data splitting
+inTrain <- createDataPartition(y=new_training$classe, p=0.75, list=FALSE)
+sub_new_training <- new_training[inTrain,]
+sub_new_testing <- new_training[-inTrain,]
+
+dim(sub_new_training); dim(sub_new_testing)
+```
+
+#Classification Tress method
+
+## Performed model fit by classificaiton trees method using the train function and invoking Rpart method. Reviewed the Rpart plot. Used the Confusion matrix function and tested the model prediction on the sub testing data set.
+```{r}
+#Classification Tress method
+Fit1 <- train(classe ~ .,method="rpart",data=sub_new_training)
+fancyRpartPlot(Fit1$finalModel)
+confusionMatrix(predict(Fit1,newdata=sub_new_testing),sub_new_testing$classe)
+```
+###The accuracy is very low. 
+
+#Random Forest method
+
+## Since the classification tress didnot yield good result, we performed model fit using Random forest function. Used the Confusion matrix function and tested this model prediction on the sub testing data set.
+
+```{r}
+#Random Forest method
+Fit2 <- randomForest(classe ~ ., data=sub_new_training, prox=TRUE)
+confusionMatrix(predict(Fit2,newdata=sub_new_testing), sub_new_testing$classe)
+```
+
+###The accuracy is as high as 99%. The sensitivity and the specificity are also high. Hence we will use this model fit to predict on the original testing set.
+
+```{r}
+#Predict the data for test set
+pred <- predict(Fit2,newdata=new_testing)
+pred
+```
+
+#Saving the predicted result for the 20 test data into individual files usin the below function provided by the instructor.
+```{r, eval=FALSE}
+#Saving the predicted data for the 20 test data into individual files for result submission
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(pred)
+```
+
